@@ -11,7 +11,7 @@ const channelMappingsRouter = require('./channelMappings');
 const unmatchedScansRouter = require('./unmatchedScans');
 
 const router = express.Router();
-
+router.use('/public/product-styles', productStylesRouter);
 router.get('/health', getHealth);
 
 // Public: login must work before any token exists.
