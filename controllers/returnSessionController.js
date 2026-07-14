@@ -167,6 +167,7 @@ exports.downloadSessionCsv = asyncHandler(async (req, res) => {
   ];
 
   const lines = [header.join(',')];
+  const returnDate = new Date().toISOString().split('T')[0];
 
   acceptances.forEach((acceptance) => {
     lines.push(
@@ -175,7 +176,7 @@ exports.downloadSessionCsv = asyncHandler(async (req, res) => {
         csvEscape(acceptance.invoice_number),
         csvEscape(RETURN_TYPE_CSV_CODE[acceptance.return_type] || ''),
         '',
-        csvEscape(formatCsvDate(acceptance.return_date)),
+        csvEscape(formatCsvDate(acceptance.return_date) || returnDate),
         csvEscape(acceptance.porduct_sku_code),
         csvEscape(acceptance.good_qty),
         csvEscape(acceptance.bad_qty),
