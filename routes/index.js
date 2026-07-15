@@ -20,9 +20,9 @@ router.use('/auth', authRouter);
 // Everything below requires a valid session.
 router.use(authMiddleware);
 
+router.use('/product-styles', productStylesRouter);
 router.use('/users', usersRouter);
 router.use('/returns', returnsRouter);
-router.use('/product-styles', productStylesRouter);
 router.use('/return-sessions', returnSessionsRouter);
 router.use('/channels', channelsRouter);
 router.use('/channel-mappings', channelMappingsRouter);

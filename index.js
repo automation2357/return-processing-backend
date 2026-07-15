@@ -6,6 +6,8 @@ const globalErrorHandler = require('./middleware/globalErrorHandler.js');
 const { PORT, CORS_ORIGIN, NODE_ENV } = require('./config/index.js');
 const { connectDB } = require('./config/db');
 const { seedInitialAdmin } = require('./utils/seedAdmin');
+const pendingOrdersRoute = require('./routes/pendingOrders.js');
+const productStylesRoute = require('./routes/productStyles.js');
 
 const app = express();
 
@@ -22,6 +24,8 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'return-processing-system' });
 });
 
+app.use('/pending-orders', pendingOrdersRoute);
+app.use('/product-styles', productStylesRoute);
 app.use('/api', routes);
 
 app.use(globalErrorHandler);
