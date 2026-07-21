@@ -1,6 +1,8 @@
-# Return Processing System — Backend
+# Pending Orders — Backend
 
-Express + MongoDB API powering Qurvii's returns and reverse-logistics workflow: importing marketplace return data, a warehouse scan-and-accept flow, channel attribution for unmatched scans, and role-based user accounts.
+Express + MongoDB API powering Qurvii's Pending Orders workflow: scanning an order, checking fabric stock, and routing it through Pending → Ready for Cutting / Ready for Process → Shipped (or Cancel Requests).
+
+This backend was forked from the Return Processing System backend, so it also still carries that project's full returns/reverse-logistics API under `/api/*` (JWT-protected). That surface is **not used by the Pending Orders frontend** in this repo — it's inherited, unused code kept for reference. See [Pending Orders API](#pending-orders-api-root-level-unauthenticated) below for what actually powers this app, and [Legacy Returns API](#legacy-returns-api-api-jwt-protected) for the rest.
 
 ## Tech Stack
 
@@ -31,6 +33,8 @@ The server listens on `PORT` (default `3000`) and expects MongoDB to be reachabl
 | `JWT_EXPIRES_IN` | Token lifetime (default `7d`) |
 | `INITIAL_ADMIN_USERNAME` | Username for the auto-seeded first admin |
 | `INITIAL_ADMIN_PASSWORD` | Password for the auto-seeded first admin |
+| `NOCODB_URL` / `NOCODB_TABLE_ID` / `NOCODB_VIEW_ID` / `NOCODB_TOKEN` | NocoDB table holding the source order data (order_id, style_number, size, channel, order_date, color, ...) — looked up when an order is scanned |
+| `FAST_API_URL` | Employee directory API (`{ id, user_name, locations }[]`) used for login and to record who scanned/moved an order |
 
 ### First Run / Bootstrap Admin
 
@@ -38,7 +42,8 @@ On startup, if the `users` collection is empty, the server automatically creates
 
 ## Authentication & Authorization
 
-- `POST /api/auth/login` is the only public endpoint besides `/health`; everything else under `/api` requires `Authorization: Bearer <token>`.
+- `/pending-orders/*` and the root-level `/product-styles/*` (what the frontend uses) have **no auth middleware at all** — anyone who can reach the server can call them. Login on the frontend is just an employee-id lookup (`GET /pending-orders/nocodb/user/:employee_id`) stored in `localStorage`, not a real session.
+- `POST /api/auth/login` is the only public endpoint besides `/health`; everything else under `/api` requires `Authorization: Bearer <token>`. (This whole `/api` surface is the unused legacy Returns API — see above.)
 - Tokens are signed JWTs containing `{ sub, username, role }`.
 - `requireAdmin` middleware gates admin-only actions: user management (`/api/users/*`), deleting a return session log, and deleting an unmatched scan.
 - Safety guards on user management: you can't delete your own logged-in account, and the last remaining admin can't be deleted or demoted.
@@ -60,6 +65,7 @@ backend/
 
 | Model | Purpose |
 |---|---|
+| `PendingOrders` | **The core model.** One scanned order: `style_number`, `order_id`, `size`, `channel`, `order_date`, `employee_id`/`employee_name` (who last touched it), `reason`, `isProcessed`, `isCancelApproval`, `isShipped`. Auto-deleted 30 days after creation (TTL index on `createdAt`) |
 | `User` | username, bcrypt password hash, role (`admin`/`staff`) |
 | `ReturnRecord` | one imported marketplace return line item (order/invoice/SKU/channel/qty/etc.) |
 | `ReturnSession` | a scanning session; `endedAt: null` means it's the currently active session |
@@ -69,9 +75,36 @@ backend/
 | `ChannelPrefixMapping` | order/tracking-id prefix → channel (e.g. `MYSC` → `Myntra`), used to auto-resolve unmatched scans |
 | `UnmatchedScan` | a scan that didn't match any `ReturnRecord`; only persisted once a channel is known (via mapping or manual pick) |
 
-## API Reference
+## Pending Orders Workflow
 
-All paths are relative to `/api`. 🔒 = requires a valid token. 🔒👑 = requires an admin token.
+An order isn't stored anywhere in this backend until someone **scans it** on the frontend's Scan Order page. From there it moves through one pipeline, tracked entirely by fields on the same `PendingOrders` document (there's no separate status field — the frontend derives the current stage from `reason` / `isProcessed` / `isCancelApproval` / `isShipped` plus live fabric stock; see `categorizeOrdersWithStockInfo` in the frontend):
+
+1. **Scan** — order_id is looked up in NocoDB (`GET /pending-orders/nocodb/:order_id`) for its style/size/channel/date, fabric stock for that style is checked against an external stock API, and the order is saved via `POST /pending-orders`.
+2. **Pending** — not enough fabric in stock yet (or manually forced back here). Sits until stock arrives or someone manually moves it.
+3. **Ready for Cutting** — enough fabric is in stock (checked live, not stored), or it was manually moved here from Pending.
+4. **Ready for Process** — flagged `Alter` or `Return Found` instead of a normal stock-driven route (set via the "Move to Process / Cancel" page).
+5. **Shipped** — `isShipped: true`, set from the Ship Order page. Terminal.
+6. **Cancel Requests** — flagged `Cancel Request` (`isCancelApproval: true`) from the "Move to Process / Cancel" page. Awaiting manual review/edit.
+
+Every transition goes through `PUT /pending-orders/:id`, updating `reason`, `isProcessed`, `isCancelApproval`, or `isShipped` — the backend has no dedicated "move to X" endpoints, it's one generic update.
+
+## Pending Orders API (root-level, unauthenticated)
+
+These are the routes the frontend actually calls. Unlike everything under `/api`, they are **not** behind `authMiddleware` — no token required.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/pending-orders?page=&limit=` | paginated list, sorted oldest first by `order_date` |
+| POST | `/pending-orders` | create one order, or bulk-insert (send an array) |
+| PUT | `/pending-orders/:id` | update any field(s) — this is how an order moves between stages |
+| GET | `/pending-orders/nocodb/:order_id` | look up an order's source data in NocoDB by `order_id` |
+| GET | `/pending-orders/nocodb/user/:employee_id` | look up an employee by id (via `FAST_API_URL`) — used for login and to stamp who did an action |
+| GET | `/product-styles?codes=a,b,c` | product images for the given style numbers (root-level copy of the `/api` version below) |
+| POST | `/product-styles/bulk` | upsert `{ style_number, images: [] }[]` |
+
+## Legacy Returns API (`/api`, JWT-protected)
+
+All paths below are relative to `/api`. 🔒 = requires a valid token. 🔒👑 = requires an admin token. **Not used by the Pending Orders frontend** — kept here for reference since the code still lives in this repo.
 
 ### Auth
 | Method | Path | Notes |
