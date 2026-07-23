@@ -4,12 +4,14 @@ const {
   createPendingOrders,
   updatePendingOrder,
   getNocoDbRecord,
+  getScanTrackingRecord,
   getUser,
 } = require('../controllers/pendingOrderController');
 const router = express.Router();
 
 router.get('/', getPendingOrders);
 router.post('/', createPendingOrders);
+router.get('/nocodb/scan-tracking/:order_id', getScanTrackingRecord);
 router.get('/nocodb/:order_id', getNocoDbRecord);
 router.get('/nocodb/user/:employee_id', getUser);
 router.put('/:id', updatePendingOrder);

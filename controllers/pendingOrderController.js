@@ -3,7 +3,7 @@ const asyncHandler = require('../utils/asyncHandler.js');
 const ApiResponse = require('../utils/ApiResponse.js');
 const ApiError = require('../utils/ApiError.js');
 const axios = require('axios');
-const { NOCODB_CONFIG } = require('../config/nocodbConfig.js');
+const { NOCODB_CONFIG, NOCODB_SCAN_TRACKING_CONFIG } = require('../config/nocodbConfig.js');
 
 /**
  * @desc Get Pending Orders
@@ -94,6 +94,23 @@ const getNocoDbRecord = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, response.data.list, 'Nocodb record fetched successfully'));
 });
 
+/**
+ * @desc Get the scan-tracking record for an order (which employee's name
+ *       landed in the scan_tracking field, if any) — used by the Processed
+ *       page to show who scanned each order.
+ * @route GET /pending-orders/nocodb/scan-tracking/:order_id
+ */
+const getScanTrackingRecord = asyncHandler(async (req, res) => {
+  const { order_id } = req.params;
+  if (!order_id) {
+    return new ApiError(409, 'order_id is required');
+  }
+  const response = await axios.request(NOCODB_SCAN_TRACKING_CONFIG(order_id));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, response.data.list, 'Scan tracking record fetched successfully'));
+});
+
 const getUser = asyncHandler(async (req, res) => {
   const { employee_id } = req.params;
   if (!employee_id) {
@@ -110,5 +127,6 @@ module.exports = {
   createPendingOrders,
   updatePendingOrder,
   getNocoDbRecord,
+  getScanTrackingRecord,
   getUser,
 };
