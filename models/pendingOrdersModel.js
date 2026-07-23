@@ -49,6 +49,15 @@ const pendingOrderSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    // Set once a Cancel Request is actually finalized (see the Cancelled
+    // page) — distinct from isCancelApproval, which only flags an order for
+    // review. Wins over isCancelApproval in resolveOrderStage so the order
+    // moves out of Cancel Requests into Cancelled.
+    isCancelled: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     reason: {
       type: String,
       default: 'No Fabric',
@@ -56,6 +65,15 @@ const pendingOrderSchema = new mongoose.Schema(
     isShipped: {
       type: Boolean,
       default: false,
+    },
+    // Set once a Ready for Process order is marked done (see the Processed
+    // page) — distinct from isProcessed, which is already used elsewhere to
+    // mean "manually routed out of Pending". Ignored once isShipped is set,
+    // since shipping is the more terminal state.
+    isProcessComplete: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
   },
   {

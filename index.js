@@ -8,6 +8,8 @@ const { connectDB } = require('./config/db');
 const { seedInitialAdmin } = require('./utils/seedAdmin');
 const pendingOrdersRoute = require('./routes/pendingOrders.js');
 const productStylesRoute = require('./routes/productStyles.js');
+const whitelistRoute = require('./routes/whitelist.js');
+const otpRoute = require('./routes/otp.js');
 
 const app = express();
 
@@ -26,6 +28,8 @@ app.get('/health', (req, res) => {
 
 app.use('/pending-orders', pendingOrdersRoute);
 app.use('/product-styles', productStylesRoute);
+app.use('/whitelist', whitelistRoute);
+app.use('/otp', otpRoute);
 app.use('/api', routes);
 
 app.use(globalErrorHandler);
