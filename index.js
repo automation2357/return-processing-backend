@@ -10,6 +10,7 @@ const pendingOrdersRoute = require('./routes/pendingOrders.js');
 const productStylesRoute = require('./routes/productStyles.js');
 const whitelistRoute = require('./routes/whitelist.js');
 const otpRoute = require('./routes/otp.js');
+const moveToPendingRequestsRoute = require('./routes/moveToPendingRequests.js');
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use('/pending-orders', pendingOrdersRoute);
 app.use('/product-styles', productStylesRoute);
 app.use('/whitelist', whitelistRoute);
 app.use('/otp', otpRoute);
+app.use('/move-to-pending-requests', moveToPendingRequestsRoute);
 app.use('/api', routes);
 
 app.use(globalErrorHandler);
