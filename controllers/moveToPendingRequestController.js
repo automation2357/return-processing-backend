@@ -6,7 +6,15 @@ const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 
 const STOCK_UPDATE_API_URL = 'https://raw-material-backend.onrender.com/api/v1/stock/update';
-const MANUAL_PENDING_REASON = 'Manual Move To Pending';
+
+// Matches frontend/src/lib/orderCategories.js's MANUAL_*_REASON constants —
+// which stage a request's order lands in once approved depends on which of
+// the OTP console's three action buttons the admin clicked.
+const REASON_BY_ACTION = {
+  pending: 'Manual Move To Pending',
+  cutting: 'Manual Move To Cutting',
+  process: 'Manual Move To Process',
+};
 
 /**
  * @desc List all pending "Move to Pending" approval requests
@@ -43,11 +51,15 @@ const createMoveToPendingRequest = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc Approve a request — creates the pending order and resets every
- *       selected fabric's stock to 0, then removes the request. This is
- *       what the OTP console's "Move to Pending Approval" tab calls when an
- *       admin clicks "Move to Pending".
+ * @desc Approve a request — creates the order, routed to Pending, Ready for
+ *       Cutting, or Ready for Process depending on req.body.action, then
+ *       removes the request. Only the 'pending' action also resets every
+ *       selected fabric's stock to 0 — cutting/process leave stock alone
+ *       (see the comment at the reset call below). This is what the OTP
+ *       console's "Move to Pending Approval" tab calls when an admin clicks
+ *       one of its three action buttons.
  * @route POST /move-to-pending-requests/:id/approve
+ * @body { action?: 'pending' | 'cutting' | 'process' } — defaults to 'pending'
  */
 const approveMoveToPendingRequest = asyncHandler(async (req, res) => {
   const request = await MoveToPendingRequest.findById(req.params.id);
@@ -55,24 +67,36 @@ const approveMoveToPendingRequest = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Move to Pending request not found');
   }
 
+  const action = REASON_BY_ACTION[req.body?.action] ? req.body.action : 'pending';
+
   const createdOrder = await PendingOrders.create({
     ...request.order,
-    reason: MANUAL_PENDING_REASON,
+    reason: REASON_BY_ACTION[action],
+    isProcessed: action !== 'pending',
   });
 
-  await Promise.all(
-    (request.fabricNumbers || [])
-      .filter((fabricNumber) => fabricNumber !== null && fabricNumber !== '')
-      .map((fabricNumber) =>
-        axios.put(STOCK_UPDATE_API_URL, { fabricNumber, stockQuantity: 0 })
-      )
-  );
+  // Only "Move to Pending" zeros the selected fabrics' stock — that's the
+  // case where the fabric was wrongly counted as available and the order is
+  // going back to wait for real stock. Move to Cutting/Process send the
+  // order straight into production, so the fabric stock is left untouched.
+  if (action === 'pending') {
+    await Promise.all(
+      (request.fabricNumbers || [])
+        .filter((fabricNumber) => fabricNumber !== null && fabricNumber !== '')
+        .map((fabricNumber) =>
+          axios.put(STOCK_UPDATE_API_URL, { fabricNumber, stockQuantity: 0 })
+        )
+    );
+  }
 
   await request.deleteOne();
 
+  const stageLabel = { pending: 'Pending', cutting: 'Ready for Cutting', process: 'Ready for Process' }[
+    action
+  ];
   res
     .status(200)
-    .json(new ApiResponse(200, createdOrder, 'Order moved to Pending successfully'));
+    .json(new ApiResponse(200, createdOrder, `Order moved to ${stageLabel} successfully`));
 });
 
 /**
