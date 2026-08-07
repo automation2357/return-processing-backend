@@ -75,6 +75,25 @@ const pendingOrderSchema = new mongoose.Schema(
       default: false,
       index: true,
     },
+    // Shopify-specific fields, editable from the Pending Orders page for
+    // channel === 'Shopify' orders only — see PendingOrdersPage's
+    // EditShopifyFieldsDialog. Shown as columns on every page regardless of
+    // channel (blank for non-Shopify orders).
+    shopify_order_id: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    shipment_status: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    // Tri-state: null/undefined means not yet set, not "no".
+    is_customer_want_product: {
+      type: Boolean,
+      default: null,
+    },
   },
   {
     timestamps: true,
