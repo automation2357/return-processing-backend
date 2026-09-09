@@ -122,6 +122,79 @@ const getUser = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, user, 'Employee id fetched successfully'));
 });
 
+const getPendingOrdersByDateRange = asyncHandler(async (req, res) => {
+  const page = Math.max(parseInt(req.query.page) || 1, 1);
+  const limit = Math.max(parseInt(req.query.limit) || 25, 1);
+  const skip = (page - 1) * limit;
+
+  // Get date range from query parameters
+  const { startDate, endDate } = req.query;
+
+  // Build filter object
+  const filter = {};
+
+  // Add date range filter if provided
+  if (startDate && endDate) {
+    // Convert to proper date objects
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    // Set end date to end of day to include all records from that day
+    end.setHours(23, 59, 59, 999);
+
+    // Validate dates
+    if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+      filter.createdAt = {
+        $gte: start,
+        $lte: end,
+      };
+    }
+  } else if (startDate) {
+    // Only start date provided
+    const start = new Date(startDate);
+    if (!isNaN(start.getTime())) {
+      filter.createdAt = { $gte: start };
+    }
+  } else if (endDate) {
+    // Only end date provided
+    const end = new Date(endDate);
+    if (!isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt = { $lte: end };
+    }
+  }
+
+  // Fetch orders with filters
+  const [orders, totalRecords] = await Promise.all([
+    PendingOrders.find(filter)
+      .sort({ createdAt: -1 }) // Latest first, or use order_date: 1 for oldest first
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    PendingOrders.countDocuments(filter),
+  ]);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        orders,
+        pagination: {
+          page,
+          limit,
+          totalRecords,
+          totalPages: Math.ceil(totalRecords / limit),
+        },
+        filters: {
+          startDate: startDate || null,
+          endDate: endDate || null,
+        },
+      },
+      'Pending orders fetched successfully.'
+    )
+  );
+});
+
 module.exports = {
   getPendingOrders,
   createPendingOrders,
@@ -129,4 +202,5 @@ module.exports = {
   getNocoDbRecord,
   getScanTrackingRecord,
   getUser,
+  getPendingOrdersByDateRange,
 };

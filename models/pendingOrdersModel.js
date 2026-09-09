@@ -101,11 +101,11 @@ const pendingOrderSchema = new mongoose.Schema(
   }
 );
 
-// Automatically delete documents 30 days after createdAt
+// Automatically delete documents 730 days after createdAt
 pendingOrderSchema.index(
   { createdAt: 1 },
 
-  { expireAfterSeconds: 30 * 24 * 60 * 60 }
+  { expireAfterSeconds: 730 * 24 * 60 * 60 }
 );
 
 const PendingOrders = mongoose.model('PendingOrders', pendingOrderSchema);
