@@ -98,6 +98,7 @@ exports.acceptReturn = asyncHandler(async (req, res) => {
     bad_qty: bad,
     return_type,
     return_comments: (return_comments || '').trim(),
+    accepted_timestamp: session.createdAt || new Date(),
   });
 
   res.status(201).json(new ApiResponse(201, acceptance, 'Return accepted successfully'));
