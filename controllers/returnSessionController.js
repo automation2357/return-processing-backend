@@ -195,3 +195,22 @@ exports.downloadSessionCsv = asyncHandler(async (req, res) => {
   );
   res.status(200).send(csvContent);
 });
+exports.getReturnAcceptanceByInvoiceNumber = asyncHandler(async (req, res) => {
+  const { invoiceNumber } = req.params;
+
+  if (!invoiceNumber) {
+    throw new ApiError(400, 'Invoice number is required');
+  }
+
+  const acceptances = await ReturnAcceptance.find({ invoice_number: invoiceNumber }).sort({
+    createdAt: -1,
+  });
+
+  if (acceptances.length === 0) {
+    throw new ApiError(404, 'No return acceptances found for the given invoice number');
+  }
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, acceptances, 'Return acceptances fetched successfully'));
+});
